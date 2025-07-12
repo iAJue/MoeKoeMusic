@@ -75,7 +75,7 @@
             :style="containerStyle"
         >
             <template v-if="lyrics.length">
-                <div class="lyrics-line current">
+                <div class="lyrics-line">
                     <div class="lyrics-content" 
                         :style="currentLineStyle"
                         :class="{ 'hovering': isHovering && !isLocked }"
@@ -88,7 +88,12 @@
                         >{{ segment.text }}</span>
                     </div>
                 </div>
-                <div class="lyrics-line next" v-if="lyrics[displayedLines[1]]">
+                <div class="lyrics-line" v-if="lyrics[displayedLines[0]]?.translated">
+                    <div class="lyrics-content" :style="{ color: defaultColor }" :class="{ 'hovering': isHovering && !isLocked }">
+                        <span>{{ lyrics[displayedLines[0]].translated }}</span>
+                    </div>
+                </div>
+                <div class="lyrics-line" v-else-if="lyrics[displayedLines[1]]">
                     <div class="lyrics-content"
                         :class="{ 'hovering': isHovering && !isLocked }"
                     >
@@ -108,10 +113,14 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+
+let currentSongHash = ''
+
 const isPlaying = ref(false)
 const isLocked = ref(false)
 const controlsOverlay = ref(null)
 const lyricsContainerRef = ref(null)
+
 const currentTime = ref(0)
 const currentLineIndex = ref(0)
 const lyrics = ref([])
@@ -214,17 +223,28 @@ const updateCurrentLineIndex = () => {
 
 const updateDisplayedLines = () => {
     const currentIdx = currentLineIndex.value
-    if (currentIdx > displayedLines.value[1]) {
-        displayedLines.value = [currentIdx, currentIdx + 1]
-        currentLineScrollX.value = 0
+    if (lyrics.value[currentIdx]?.translated?.length) {
+        displayedLines.value = [currentIdx];
         nextTick(() => {
-            const elements = document.querySelectorAll('.lyrics-line .character')
-            elements.forEach(el => {
+            const line = document.querySelectorAll('.lyrics-line')[0]
+            line.querySelectorAll('.character').forEach(el => {
                 el.style.backgroundPosition = '100% 0'
                 el.style.transition = 'none'
             })
         })
+        return
     }
+    if (currentIdx % 2) displayedLines.value = [currentIdx + 1, currentIdx]
+    else displayedLines.value = [currentIdx, currentIdx + 1]
+    currentLineScrollX.value = 0
+    nextTick(() => {
+        const lines = document.querySelectorAll('.lyrics-line')
+        const line = lines[currentIdx % 2 ? 0 : 1]
+        if (line) line.querySelectorAll('.character').forEach(el => {
+            el.style.backgroundPosition = '100% 0'
+            el.style.transition = 'none'
+        })
+    })
 }
 
 // 开始拖动
@@ -254,10 +274,8 @@ const checkMousePosition = (event) => {
 }
 
 window.electron.ipcRenderer.on('lyrics-data', (data) => {
-    if (data.currentTime < 1 || 
-        lyrics.value.length === 0 || 
-        JSON.stringify(lyrics.value) !== JSON.stringify(data.lyricsData)) {
-        
+    if (data.currentTime < 1 || lyrics.value.length === 0 || data.currentSongHash !== currentSongHash) {
+        currentSongHash = data.currentSongHash
         lyrics.value = data.lyricsData;
         processLyrics(); 
         currentLineIndex.value = 0;
@@ -414,7 +432,6 @@ html {
     font-weight: bold;
     letter-spacing: 2px;
     background-image: linear-gradient(to right, #ff0000, #00ff00);
-    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
     color: transparent;
     transition: all 0.3s ease;
 }
@@ -510,14 +527,7 @@ html {
     overflow: hidden;
     position: relative;
     transition: transform 0.3s ease-out;
-}
-
-.lyrics-line.current {
-    text-align: left;
-}
-
-.lyrics-line.next {
-    text-align: right;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
 }
 
 .lyrics-content {

@@ -35,8 +35,8 @@ export default function useLyricsHandler(t) {
                 SongTips.value = t('huo-qu-ge-ci-shi-bai');
                 return;
             }
-
-            parseLyrics(lyricResponse.decodeContent);
+            console.log('[LyricsHandler] 请求歌词……');
+            parseLyrics(lyricResponse.decodeContent, settings?.lyricsTranslation === 'on');
             originalLyrics.value = lyricResponse.decodeContent;
             centerFirstLine();
         } catch (error) {
@@ -45,27 +45,40 @@ export default function useLyricsHandler(t) {
     };
 
     // 解析歌词
-    const parseLyrics = (text) => {
+    const parseLyrics = (text, parseTranslation = true) => {
+        let translatedLyrics = [];
         const lines = text.split('\n');
-        const parsedLyrics = lines
-            .map((line) => {
-                const match = line.match(/^\[(\d+),(\d+)\](.*)/);
-                if (match) {
-                    const time = parseInt(match[1]);
-                    const duration = parseInt(match[2]);
-                    const lyric = match[3].replace(/<.*?>/g, '');
-                    const characters = lyric.split('').map((char, index) => ({
-                        char,
-                        startTime: time + (index * duration) / lyric.length,
-                        endTime: time + ((index + 1) * duration) / lyric.length,
-                        highlighted: false,
-                    }));
-                    return { characters };
-                }
-                return null;
-            })
-            .filter((line) => line);
-        lyricsData.value = parsedLyrics;
+        try {
+            const languageDataCode = lines.find(line => line.startsWith('[language:'));
+            if (languageDataCode && parseTranslation) {
+                const match = languageDataCode.match(/\[language:(.*)\]/g);
+                const languageData = JSON.parse(atob(match[0].replace('[language:', '').replace(']', '')));
+                const translatedData = languageData?.content?.find(item => item.type === 1);
+                if (translatedData) translatedLyrics = translatedData?.lyricContent ?? [];
+            }
+        } catch (error) {
+            console.warn('[LyricsHandler] 解析翻译歌词失败！');
+            translatedLyrics = [];
+        }
+        const prasedLyrics = lines.map((line) => {
+            const match = line.match(/^\[(\d+),(\d+)\](.*)/);
+            if (match) {
+                const time = parseInt(match[1]);
+                const duration = parseInt(match[2]);
+                const lyric = match[3].replace(/<.*?>/g, '');
+                const characters = lyric.split('').map((char, index) => ({
+                    char,
+                    startTime: time + (index * duration) / lyric.length,
+                    endTime: time + ((index + 1) * duration) / lyric.length,
+                    highlighted: false,
+                }));
+                return { characters };
+            }
+            return null;
+        }).filter((line) => line);
+        if (translatedLyrics.length)
+            prasedLyrics.forEach((line, index) => line.translated = translatedLyrics[index][0]);
+        lyricsData.value = prasedLyrics;
     };
 
     // 居中显示第一行歌词
@@ -80,7 +93,7 @@ export default function useLyricsHandler(t) {
     };
 
     // 高亮当前字符
-    const highlightCurrentChar = (currentTime) => {
+    const highlightCurrentChar = (currentTime, scroll = true) => {
         lyricsData.value.forEach((lineData, index) => {
             let isLineHighlighted = false;
             lineData.characters.forEach((charData) => {
@@ -90,12 +103,12 @@ export default function useLyricsHandler(t) {
                 }
             });
 
-            if (isLineHighlighted && currentLineIndex !== index) {
+            if (scroll && isLineHighlighted && currentLineIndex !== index) {
                 currentLineIndex = index;
                 const lyricsContainer = document.getElementById('lyrics-container');
-                if (!lyricsContainer) return;
+                if (!lyricsContainer) return false;
                 const containerHeight = lyricsContainer.offsetHeight;
-                const lineElement = document.querySelectorAll('.line')[index];
+                const lineElement = document.querySelectorAll('.line-group')[index];
                 if (lineElement) {
                     const lineHeight = lineElement.offsetHeight;
                     scrollAmount.value = -lineElement.offsetTop + (containerHeight / 2) - (lineHeight / 2);
@@ -123,7 +136,7 @@ export default function useLyricsHandler(t) {
                 const lyricsContainer = document.getElementById('lyrics-container');
                 if (!lyricsContainer) return;
                 const containerHeight = lyricsContainer.offsetHeight;
-                const lineElement = document.querySelectorAll('.line')[lineIndex];
+                const lineElement = document.querySelectorAll('.line-group')[lineIndex];
                 if (lineElement) {
                     const lineHeight = lineElement.offsetHeight;
                     scrollAmount.value = -lineElement.offsetTop + (containerHeight / 2) - (lineHeight / 2);
@@ -138,12 +151,10 @@ export default function useLyricsHandler(t) {
 
         for (const lineData of lyricsData.value) {
             const firstChar = lineData.characters[0];
-            const lastChar =
-                lineData.characters[lineData.characters.length - 1];
+            const lastChar = lineData.characters[lineData.characters.length - 1];
 
             if (
-                firstChar &&
-                lastChar &&
+                firstChar && lastChar &&
                 currentTime * 1000 >= firstChar.startTime &&
                 currentTime * 1000 <= lastChar.endTime
             ) {

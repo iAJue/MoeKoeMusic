@@ -129,6 +129,8 @@ const selectedSettings = ref({
     lyricsBackground: { displayText: t('da-kai'), value: 'on' },
     desktopLyrics: { displayText: t('guan-bi'), value: 'off' },
     lyricsFontSize: { displayText: t('zhong'), value: '24px' },
+    lyricsTranslation: { displayText: t('da-kai'), value: 'on' },
+    lyricsAlign: { displayText: '居中', value: 'center' },
     font: { displayText: '默认字体', value: '' },
     fontUrl: { displayText: '默认字体', value: '' },
     greetings: { displayText: t('kai-qi'), value: 'on' },
@@ -140,7 +142,7 @@ const selectedSettings = ref({
     apiMode: { displayText: t('guan-bi'), value: 'off' },
     touchBar: { displayText: t('guan-bi'), value: 'off' },
     autoStart: { displayText: t('guan-bi'), value: 'off' },
-    startMinimized: { displayText: t('guan-bi'), value: 'off' }
+    startMinimized: { displayText: t('guan-bi'), value: 'off' },
 });
 
 // 设置分区配置
@@ -209,6 +211,16 @@ const settingSections = computed(() => [
             {
                 key: 'desktopLyrics',
                 label: t('xian-shi-zhuo-mian-ge-ci')
+            },
+            {
+                key: 'lyricsTranslation',
+                label: '歌词翻译',
+                showRefreshHint: true,
+                refreshHintText: t('zhong-qi-hou-sheng-xiao')
+            },
+            {
+                key: 'lyricsAlign',
+                label: '歌词对齐',
             }
         ]
     },
@@ -365,6 +377,20 @@ const selectionTypeMap = {
             { displayText: t('guan-bi'), value: 'off' }
         ]
     },
+    lyricsTranslation: {
+        title: '歌词翻译',
+        options: [
+            { displayText: t('da-kai'), value: 'on' },
+            { displayText: t('guan-bi'), value: 'off' }
+        ]
+    },
+    lyricsAlign: {
+        title: '歌词对齐',
+        options: [
+            { displayText: '左对齐', value: 'left' },
+            { displayText: '居中', value: 'center' },
+        ]
+    },
     qualityCompatibility: {
         title: '兼容模式',
         options: [
@@ -424,6 +450,7 @@ const showRefreshHint = ref({
     nativeTitleBar: false,
     lyricsBackground: false,
     lyricsFontSize: false,
+    lyricsAlign: false,
     gpuAcceleration: false,
     highDpi: false,
     font: false,
